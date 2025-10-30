@@ -1,0 +1,25 @@
+- alias: "回家后切换 Surge 家庭配置"
+  trigger:
+    - platform: zone
+      entity_id: person.你的名字
+      zone: zone.home
+      event: enter  # 进入家庭区域时触发
+  action:
+    - service: select.select_option
+      target:
+        entity_id: select.surge_active_profile
+      data:
+        option: "家庭配置"  # 替换为你的 Surge 家庭配置名称
+
+- alias: "离家后切换 Surge 外出配置"
+  trigger:
+    - platform: zone
+      entity_id: person.你的名字
+      zone: zone.home
+      event: leave  # 离开家庭区域时触发
+  action:
+    - service: select.select_option
+      target:
+        entity_id: select.surge_active_profile
+      data:
+        option: "外出配置"  # 替换为你的 Surge 外出配置名称
