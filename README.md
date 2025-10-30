@@ -4,19 +4,6 @@
 1. 通过HACS添加仓库：`[https://github.com/wangshiw/Surge-Integration]`  
 2. 下载并重启Home Assistant。  
 ## 配置  
-在`configuration.yaml`中添加：  
-```yaml  
-surge:  
-  host: 192.168.50.29  
-  api_key: abc123
-  features:                   # 通用功能开关
-    - mitm
-    - capture
-    - rewrite
-    - scripting
-  mac_features:               # Mac 专属功能开关
-    - system_proxy
-    - enhanced_mode
-  update_interval: 30         # 状态刷新间隔（秒）
-  use_https: false            # 是否启用 HTTPS（需 Surge 支持）
-  verify_ssl: true            # 是否验证 SSL 证书（测试时可设为 false）
+进入「设置 → 设备与服务 → 添加集成」→ 搜索「Surge」
+
+填写表单（IP / 端口 / API Key 等）→ 点击「提交」，自动完成配置
