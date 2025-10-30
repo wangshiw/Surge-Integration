@@ -1,118 +1,116 @@
+"""Surge Integration 初始化（适配Config Flow）"""
+
 import logging
 from typing import Dict, Any
-import voluptuous as vol
+
+from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
-from homeassistant.helpers import config_validation as cv
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
-from homeassistant.helpers.typing import ConfigType, DiscoveryInfoType
+from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
 
-from .surge_api import SurgeAPIClient
-from .select import SurgeProfileSelect, SurgeOutboundSelect, SurgePolicyGroupSelect
-from .switch import SurgeFeatureSwitch
-from .sensor import SurgeTrafficSensor
+from .const import (
+    CONF_API_KEY,
+    CONF_HOST,
+    CONF_PORT,
+    CONF_UPDATE_INTERVAL,
+    CONF_USE_HTTPS,
+    CONF_VERIFY_SSL,
+    DOMAIN,
+    DEVICE_MANUFACTURER,
+    DEVICE_MODEL,
+    DEVICE_NAME,
+)
+from .surge_api import SurgeAPIClient, SurgeAPIError
 
 _LOGGER = logging.getLogger(__name__)
 
-DOMAIN = "surge"
-
-# ------------------------------ 新增：HTTPS/SSL 配置字段 ------------------------------
-CONFIG_SCHEMA = vol.Schema(
-    {
-        DOMAIN: vol.Schema(
-            {
-                vol.Required("host"): cv.string,
-                vol.Required("port"): cv.port,
-                vol.Required("api_key"): cv.string,
-                vol.Optional("features", default=["mitm", "capture", "rewrite", "scripting"]): cv.ensure_list,
-                vol.Optional("mac_features", default=["system_proxy", "enhanced_mode"]): cv.ensure_list,
-                vol.Optional("update_interval", default=30): cv.positive_int,
-                vol.Optional("use_https", default=False): cv.boolean,  # 新增：是否启用 HTTPS
-                vol.Optional("verify_ssl", default=True): cv.boolean   # 新增：是否验证 SSL 证书
-            }
-        )
-    },
-    extra=vol.ALLOW_EXTRA,
-)
-
+# 全局存储键（用于传递API客户端和配置）
 API_CLIENT = "api_client"
-UPDATE_INTERVAL = "update_interval"
+UPDATE_COORDINATOR = "update_coordinator"
 
-async def async_setup(
-    hass: HomeAssistant, config: ConfigType
-) -> bool:
-    if DOMAIN not in config:
-        return True
 
-    # 读取用户配置（新增：use_https 和 verify_ssl）
-    surge_config = config[DOMAIN]
-    host = surge_config["host"]
-    port = surge_config["port"]
-    api_key = surge_config["api_key"]
-    features = surge_config["features"]
-    mac_features = surge_config["mac_features"]
-    update_interval = surge_config["update_interval"]
-    use_https = surge_config["use_https"]  # 新增
-    verify_ssl = surge_config["verify_ssl"]  # 新增
+async def async_setup(hass: HomeAssistant, config: Dict[str, Any]) -> bool:
+    """废弃：原yaml配置入口，现在通过Config Flow初始化"""
+    return True
 
-    # 创建 API 客户端（新增：传入 HTTPS/SSL 参数）
+
+async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
+    """从Config Entry初始化组件（核心入口）"""
+    # 1. 从Config Entry获取用户配置
+    config_data = entry.data
+    host = config_data[CONF_HOST]
+    port = config_data[CONF_PORT]
+    api_key = config_data[CONF_API_KEY]
+    use_https = config_data[CONF_USE_HTTPS]
+    verify_ssl = config_data[CONF_VERIFY_SSL]
+    update_interval = config_data[CONF_UPDATE_INTERVAL]
+
+    # 2. 初始化API客户端
     session = async_get_clientsession(hass)
     try:
         api_client = SurgeAPIClient(
-            host, port, api_key, session,
-            use_https=use_https, verify_ssl=verify_ssl
+            host=host,
+            port=port,
+            api_key=api_key,
+            session=session,
+            use_https=use_https,
+            verify_ssl=verify_ssl,
         )
-        await api_client.get_profiles()  # 测试连接
-    except Exception as e:
-        _LOGGER.error(f"初始化 Surge API 客户端失败：{str(e)}")
+        # 测试API连接（确保配置有效）
+        await api_client.get_profiles()
+    except Exception as exc:
+        _LOGGER.error(f"初始化Surge API客户端失败: {str(exc)}")
         return False
 
-    # 存储全局数据（新增：HTTPS 配置）
-    hass.data[DOMAIN] = {
+    # 3. 创建全局数据存储（供其他平台使用）
+    if DOMAIN not in hass.data:
+        hass.data[DOMAIN] = {}
+    hass.data[DOMAIN][entry.entry_id] = {
         API_CLIENT: api_client,
-        UPDATE_INTERVAL: update_interval,
-        "features": features,
-        "mac_features": mac_features,
-        "use_https": use_https,
-        "verify_ssl": verify_ssl
     }
 
-    # ------------------------------ 新增：动态注册策略组实体 ------------------------------
-    async def async_setup_entities(
-        hass: HomeAssistant,
-        config: ConfigType,
-        async_add_entities: AddEntitiesCallback,
-        discovery_info: DiscoveryInfoType = None,
-    ):
-        api = hass.data[DOMAIN][API_CLIENT]
-        interval = hass.data[DOMAIN][UPDATE_INTERVAL]
-        entities = []
+    # 4. 注册实体平台（select/switch/sensor）
+    hass.async_create_task(
+        hass.config_entries.async_forward_entry_setups(entry, ["select", "switch", "sensor"])
+    )
 
-        # 1. 原有实体：配置选择、出站模式、功能开关、流量传感器
-        entities.append(SurgeProfileSelect(api, interval))
-        entities.append(SurgeOutboundSelect(api, interval))  # 新增：出站模式实体
+    # 5. 监听配置更新（如需支持修改配置）
+    entry.async_on_unload(entry.add_update_listener(async_update_entry))
 
-        for feature in hass.data[DOMAIN]["features"]:
-            entities.append(SurgeFeatureSwitch(api, feature, interval))
-        for feature in hass.data[DOMAIN]["mac_features"]:
-            entities.append(SurgeFeatureSwitch(api, feature, interval, is_mac_only=True))
-        entities.append(SurgeTrafficSensor(api, interval))
-
-        # 2. 新增：动态创建策略组实体（获取所有策略组，每个组对应一个实体）
-        try:
-            policy_groups = await api.get_policy_groups()
-            for group in policy_groups:
-                entities.append(SurgePolicyGroupSelect(api, interval, group))
-            _LOGGER.info(f"成功加载 {len(policy_groups)} 个策略组实体")
-        except Exception as e:
-            _LOGGER.warning(f"加载策略组实体失败：{str(e)}（可能 Surge 版本不支持）")
-
-        async_add_entities(entities, update_before_add=True)
-
-    # 注册所有实体平台
-    hass.helpers.discovery.async_load_platform("select", DOMAIN, {}, async_setup_entities)
-    hass.helpers.discovery.async_load_platform("switch", DOMAIN, {}, async_setup_entities)
-    hass.helpers.discovery.async_load_platform("sensor", DOMAIN, {}, async_setup_entities)
-
-    _LOGGER.info("Surge 组件（含扩展功能）初始化成功")
+    _LOGGER.info(f"Surge组件初始化成功（设备：{host}:{port}）")
     return True
+
+
+async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
+    """卸载配置项（清理资源）"""
+    # 卸载所有平台实体
+    unload_ok = await hass.config_entries.async_unload_platforms(entry, ["select", "switch", "sensor"])
+    # 删除全局存储的API客户端
+    if DOMAIN in hass.data and entry.entry_id in hass.data[DOMAIN]:
+        del hass.data[DOMAIN][entry.entry_id]
+    # 若没有其他配置项，删除整个DOMAIN存储
+    if not hass.data[DOMAIN]:
+        del hass.data[DOMAIN]
+    return unload_ok
+
+
+async def async_update_entry(hass: HomeAssistant, entry: ConfigEntry) -> None:
+    """配置项更新时重新初始化（暂不实现，如需修改配置可扩展）"""
+    await async_unload_entry(hass, entry)
+    await async_setup_entry(hass, entry)
+
+
+# ------------------------------ 通用实体工具函数 ------------------------------
+def get_common_device_info(entry: ConfigEntry) -> Dict[str, Any]:
+    """获取统一的设备信息（所有实体共享，确保在HA中显示为同一设备）"""
+    host = entry.data[CONF_HOST]
+    port = entry.data[CONF_PORT]
+    return {
+        "identifiers": {(DOMAIN, f"{entry.entry_id}_{host}_{port}")},  # 唯一设备标识
+        "name": DEVICE_NAME,
+        "manufacturer": DEVICE_MANUFACTURER,
+        "model": DEVICE_MODEL,
+        "sw_version": "1.1.0",  # 组件版本
+        "configuration_url": f"http://{host}:{port}" if not entry.data[CONF_USE_HTTPS] else f"https://{host}:{port}",
+    }
