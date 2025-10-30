@@ -1,0 +1,9 @@
+{
+  "name": "Surge Integration",         // HACS中显示的名称
+  "description": "Control Surge via HTTP API", // 简短描述
+  "maintainers": ["豆包"], // 维护者GitHub用户名
+  "homeassistant": "2025.10.0",         // 最低兼容的Home Assistant版本
+  "categories": ["integration"],         // 分类（必填）
+  "domain": "surge",                    // 与组件domain一致
+  "render_readme": true                 // 使用仓库README.md作为介绍页
+}
