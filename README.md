@@ -1,4 +1,4 @@
-# Surge Integration for Home Assistant  
+# 完全由豆包编写，无修改能力
 控制Surge代理的HTTP API，支持策略组切换、流量监控等功能。  
 ## 安装  
 1. 通过HACS添加仓库：`[https://github.com/wangshiw/Surge-Integration]`  
