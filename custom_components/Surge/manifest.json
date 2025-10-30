@@ -3,10 +3,11 @@
   "name": "Surge Controller",
   "version": "0.1.0",
   "requirements": ["aiohttp>=3.8.0"],
-  "author": "Your Name",
+  "config_flow": true
+  "author": "豆包",
   "description": "Control Surge via its HTTP API (supports multiple profiles, feature switches, and traffic monitoring)",
   "homepage": "https://github.com/your-repo/homeassistant-surge",
   "dependencies": [],
-  "codeowners": ["@your-github-username"],
+  "codeowners": ["@wangshiw"],
   "iot_class": "local_polling"
 }
