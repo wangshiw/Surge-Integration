@@ -2,12 +2,15 @@
   "domain": "surge",
   "name": "Surge Controller",
   "version": "0.1.0",
+  "config_flow": true,  // 启用UI配置（核心）
   "requirements": ["aiohttp>=3.8.0"],
-  "config_flow": true
   "author": "豆包",
-  "description": "Control Surge via its HTTP API (supports multiple profiles, feature switches, and traffic monitoring)",
-  "homepage": "https://github.com/your-repo/homeassistant-surge",
+  "description": "Control Surge via HTTP API (UI配置支持，含多配置/策略组/流量监控)",
+  "homepage": "https://github.com/your-username/homeassistant-surge",
   "dependencies": [],
   "codeowners": ["@wangshiw"],
-  "iot_class": "local_polling"
+  "iot_class": "local_polling",
+  "documentation": "https://github.com/wangshiw/Surge-Integration/blob/main/README.md",
+  "issue_tracker": "https://github.com/wangshiw/Surge-Integration/issues",
+  "loggers": ["custom_components.surge"]
 }
