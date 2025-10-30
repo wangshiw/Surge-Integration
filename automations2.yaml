@@ -1,0 +1,21 @@
+- alias: "工作时间自动启用 Surge Rule 模式"
+  trigger:
+    - platform: time
+      at: "09:00:00"  # 每天 9 点触发
+  action:
+    - service: select.select_option
+      target:
+        entity_id: select.surge_outbound_select
+      data:
+        option: "rule"  # 工作时间用规则模式
+
+- alias: "深夜自动切换 Surge Direct 模式"
+  trigger:
+    - platform: time
+      at: "23:00:00"  # 每天 23 点触发
+  action:
+    - service: select.select_option
+      target:
+        entity_id: select.surge_outbound_select
+      data:
+        option: "direct"  # 深夜用直连模式，节省资源
